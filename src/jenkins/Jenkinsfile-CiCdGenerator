@@ -1,0 +1,124 @@
+/**
+ * Find if job already exixts
+ * @param jobName [Name of the job]
+ * @return [True if job already exists]
+ */
+def doesJobsExists(String jobName) {
+    def instance = jenkins.model.Jenkins.instance
+    return instance.getItem(jobName) != null
+}
+
+/**
+ * Copy reference files for jenkins/CFN from pipeline repo to target repo
+ * @return [True when sucessful]
+ */
+def copyFilesFromStandardTemplate(String folder) {
+    sh "pwd"
+    sh "find ../*"
+    return sh(script: "cp -rv ../../src/standardTemplates/${folder} .")
+}
+/**
+ * Add all files in the folder and push it to source repo
+ * @param message [Commit message]
+ */
+def gitCommitPush(String message) {
+    sh(script: "git add .")
+    sh(script: "git commit -m \"${message}\"")
+    sh(script: "git status")
+    sh(script: "git push origin master")
+}
+
+pipeline {
+    agent {
+        node {
+            label 'master'
+        }
+    }
+    stages {
+        stage('Setup') {
+            steps {
+                script {
+                    config = readProperties(file: 'src/jenkins/config.env')
+                    config.GIT_URL = "${config.GITHUB}:${env.REPO_NAME}.git"
+                }
+            }
+        }
+        stage('SanityCheck: Pipeline') {
+            steps {
+                script {
+                    def projectName = env.REPO_NAME.tokenize('/').last()
+                    env.JOB_EXISTS = doesJobsExists(projectName)
+                }
+            }
+        }
+        stage("Override pipeline??") {
+            agent none
+            when { environment name: 'JOB_EXISTS', value: 'true' }
+            steps {
+                timeout(time: 15, unit: 'MINUTES') {
+                    input(message: "Jenkins pipeline for this repo ${env.REPO_NAME} exists. Do you want to override pipeline config?")
+                }
+            }
+            post {
+                success {
+                    echo 'Proceeding to create pipeline'
+                }
+                aborted {
+                    echo "job aborted."
+                }
+            }
+        }
+        stage('SanityCheck: Git repo') {
+            steps {
+                println("Checkout the repo: ${env.REPO_NAME}")
+                dir(REPO_NAME) {
+                    git(url: config.GIT_URL, credentialsId: "${config.SSH_KEY_ID}", branch: 'master')
+                    script {
+                        env.JENKINS_FOLDER_EXISTS = fileExists('jenkins')
+                        env.CFN_FOLDER_EXISTS = fileExists('cfn')
+                    }
+                }
+            }
+        }
+        stage('Copy jenkins files') {
+            when { environment name: 'JENKINS_FOLDER_EXISTS', value: 'false' }
+            steps {
+                println("Copy jenkins reference files to ${env.REPO_NAME} repo")
+                dir(REPO_NAME) {
+                    git(url: config.GIT_URL, credentialsId: "${config.SSH_KEY_ID}", branch: 'master')
+                    sshagent(credentials: ["${config.SSH_KEY_ID}"], ignoreMissing: false) {
+                        copyFilesFromStandardTemplate('jenkins')
+                        gitCommitPush("Add jenkins files")
+                    }
+                }
+            }
+        }
+        stage('Copy CFN files') {
+            when { environment name: 'CFN_FOLDER_EXISTS', value: 'false' }
+            steps {
+                println("Copy CFN reference files to ${env.REPO_NAME} repo")
+                dir(REPO_NAME) {
+                    git(url: config.GIT_URL, credentialsId: "${config.SSH_KEY_ID}", branch: 'master')
+                    sshagent(credentials: ["${config.SSH_KEY_ID}"], ignoreMissing: false) {
+                        copyFilesFromStandardTemplate('cfn')
+                        gitCommitPush("Add cfn files")
+                    }
+                }
+            }
+        }
+        stage('Trigger pipeline creation') {
+            steps {
+                println("Creating pipeline")
+            }
+            post {
+                success {
+                    echo 'Creating pipeline'
+                    build job: 'ci-cd-generator/jobs-generator-github', parameters: [[$class: 'StringParameterValue', name: 'REPO_NAME', value: "${env.REPO_NAME}"]], wait: false
+                }
+                aborted {
+                    echo "job aborted."
+                }
+            }
+        }
+    }
+}

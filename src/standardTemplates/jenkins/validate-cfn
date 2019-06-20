@@ -1,0 +1,25 @@
+#!/bin/bash
+PWD="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+CLOUDFORMATION_DIRECTORY=`cd "$PWD"/../cfn/templates/; pwd`
+which aws 1>/dev/null 2>&1
+if [[ $? -gt 0 ]]; then
+	echo "AWS CLI not installed. Cannot validate Cloudformation Templates."
+	exit 1
+fi
+
+if [[ -d "${CLOUDFORMATION_DIRECTORY}" ]]; then
+	echo "CLOUDFORMATION_DIRECTORY: $CLOUDFORMATION_DIRECTORY"
+	find "${CLOUDFORMATION_DIRECTORY}" -type f -name '*.json' -o -name '*.yaml' | while read TEMPLATE; do
+		echo "Validating CloudFormation template ${TEMPLATE} using aws cli..."
+		aws cloudformation validate-template --region us-east-1 --template-body file://"${TEMPLATE}" 1>/dev/null
+		if [[ $? -gt 0 ]]; then
+			exit 1
+		fi
+		echo "CFN validation OK"
+		cfn_nag_scan --input-path "${TEMPLATE}"
+		if [[ $? -gt 0 ]]; then
+			exit 1
+		fi
+		echo "CFN_NAG OK"
+	done
+fi

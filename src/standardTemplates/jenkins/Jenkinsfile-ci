@@ -1,0 +1,46 @@
+import org.jenkinsci.plugins.pipeline.modeldefinition.Utils
+
+// assuming an agent is configured as alpine
+node('alpine') {
+  checkout scm
+  def jenkinsUtils = load "./jenkins/Utils.groovy"
+  def config = jenkinsUtils.getConfig()
+  config.initialCommitHash = jenkinsUtils.getCommitHash()
+  stage('Build') {
+
+  }
+  stage('Test') {
+    prinln("StageName: $STAGE_NAME")
+    withCredentials([[
+      $class: "AmazonWebServicesCredentialsBinding",
+      credentialsId: "aws-role"
+    ]]) {
+      sh(script: './jenkins/validate-cfn')
+    }
+
+  }
+  stage('Code Analysis') {
+    println("Sonar, Detek etc.")
+  }
+  stage('Create snapshot artifact') {
+  
+  }
+  stage('Deploy snapshot') {
+  
+  }
+  stage('Test snapshot') {
+  
+  }
+  stage('Release') {
+    git(
+      url: scm.getUserRemoteConfigs()[0].getUrl(),
+      branch: config.TRUNK_NAME,
+      credentialsId: config.SSH_KEY_ID
+    )
+    if(jenkinsUtils.isReleasable(config)) {
+      // Release lifecycle
+    } else {
+      Utils.markStageSkippedForConditional("$STAGE_NAME")
+    }
+  }
+}

@@ -1,0 +1,116 @@
+#!/usr/bin/env groovy
+
+// URL: https://github.com/sriramsundhar/ci-cd-generator
+// REPO_NAME: sriramsundhar/ci-cd-generator
+def repoName = REPO_NAME
+def gitRepo = 'git@github.com/' + repoName
+println("RepoName: $repoName")
+println("gitRepo: $gitRepo")
+def (org, projectName) = repoName.tokenize('/')
+//def org = repoName.tokenize('/').last().split("\\.")[1]
+//def projectName = repoName.tokenize('/').last().split("\\.")[0]
+println(projectName)
+def sshKeyId = SSH_KEY_ID
+
+// Create folder for the repo
+folder(projectName) {
+    description("PR, CI & CD jobs for ${repoName} repository")
+}
+
+pipelineJob(projectName + '/ci') {
+    description('This task runs and creates a release candidate (git tag) when ever a change request lands on the trunk (master) branch.')
+    definition {
+        cpsScm {
+            lightweight(true)
+            scm {
+                git {
+                    branch('refs/heads/master')
+                    remote {
+                        github(repoName, 'ssh')
+                        credentials(sshKeyId)
+                        refspec('+refs/heads/master:refs/remotes/origin/master')
+                    }
+                }
+            }
+            scriptPath('jenkins/Jenkinsfile-ci')
+        }
+    }
+    triggers {
+        githubPush()
+    }
+}
+
+// Create Job inside the folder
+pipelineJob(projectName + '/pr') {
+    description('This task runs when a pull request is created or when a commit is pushed into an existing pull request.')
+    definition {
+        cpsScm {
+            lightweight(false)
+            scm {
+                git {
+                    branch('${sha1}')
+                    remote {
+                        github(repoName, 'ssh')
+                        credentials(sshKeyId)
+                        refspec('+refs/pull/*:refs/remotes/origin/pr/*')
+                    }
+                }
+            }
+            scriptPath('jenkins/Jenkinsfile-ci')
+        }
+        triggers {
+            ghprbTrigger {
+                orgslist(org)
+                useGitHubHooks(true)
+                permitAll(true)
+                // default required feilds
+                adminlist("")
+                whitelist("")
+                cron("")
+                triggerPhrase("")
+                onlyTriggerPhrase(false)
+                autoCloseFailedPullRequests(false)
+                displayBuildErrorsOnDownstreamBuilds(false)
+                commentFilePath("")
+                skipBuildPhrase("skipBuild")
+                blackListCommitAuthor("")
+                allowMembersOfWhitelistedOrgsAsAdmin(false)
+                gitHubAuthId("")
+                buildDescTemplate("")
+                blackListLabels("")
+                whiteListLabels("")
+                includedRegions("")
+                excludedRegions("")
+                commitStatusContext("Default: Build pull request")
+                msgSuccess("Default: All is well")
+                msgFailure("Default: Something went wrong. Investigate!")
+            }
+        }
+    }
+}
+
+
+pipelineJob(projectName + '/cd') {
+    description('This task is triggered when a sucessful release candidate is created as part of ci.')
+    definition {
+        cpsScm {
+            lightweight(true)
+            scm {
+                git {
+                    branch('refs/tags/${BUILD_VERSION}')
+                    remote {
+                        github(gitRepo, 'ssh')
+                        credentials(sshKeyId)
+                    }
+                }
+            }
+            scriptPath('jenkins/Jenkinsfile-cd')
+        }
+    }
+    parameters {
+        gitParam('BUILD_VERSION') {
+            tagFilter('*')
+            sortMode('DESCENDING_SMART')
+        }
+    }
+}
