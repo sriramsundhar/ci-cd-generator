@@ -99,9 +99,11 @@ Map getConfig() {
   //assuming gradle project
   config = readProperties(defaults: config, file:'settings.gradle')
   config = readProperties(defaults: config, file:'gradle.properties')
-  config.groupLocation = config.group.replace(".", "/")
-  // location in artifactory
-  config.location = "${config.groupLocation}/${config.name}/${config.version}/${config.name}-${config.version}.jar"
+  if(config.group != null) {
+    config.groupLocation = config.group.replace(".", "/")
+    // location in artifactory
+    config.location = "${config.groupLocation}/${config.name}/${config.version}/${config.name}-${config.version}.jar"
+  }
   return config
 }
 

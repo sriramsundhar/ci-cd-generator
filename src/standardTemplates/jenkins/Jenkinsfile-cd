@@ -1,0 +1,38 @@
+/**
+ * Deploy stack to application
+ * @param env environmant name
+ */
+void deployStacks(String env) {
+  node('alpine') {
+    checkout scm
+    def jenkinsUtils = load "./jenkins/Utils.groovy"
+    def stackName = jenkinsUtils.getStackName(env)
+    // withCredentials([[$class: "AmazonWebServicesCredentialsBinding", credentialsId: "AWSJenkinksUser"]]) {
+    //   // eg. aws stack
+    //   sh "aws cloudformation deploy --stack-name $stackName --region us-east-1 --template-file cfn/templates/cfn.yaml --parameter-overrides name=value --tags Environment=$env"
+    //   sh "aws cloudformation update-termination-protection --enable-termination-protection --stack-name $stackName --region us-east-1"
+    // 	sh "aws cloudformation detect-stack-drift --stack-name $stackName --region us-east-1"
+    // }
+  }
+}
+
+stage('Deploying in dev') {
+  deployStacks('dev')
+}
+stage('Proceed to staging??') {
+  timeout(time: 4, unit: 'HOURS') {
+    input(message: 'Proceed to staging?')
+  }
+}
+stage('Deploying in staging') {
+  deployStacks('staging')
+}
+stage('Proceed to prod??') {
+  timeout(time: 8, unit: 'HOURS') {
+    input(message: 'Proceed to staging?')
+  }
+}
+stage('Deploying in staging') {
+  deployStacks('prod')
+}
+        
