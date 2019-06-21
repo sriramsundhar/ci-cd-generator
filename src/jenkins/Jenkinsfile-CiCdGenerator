@@ -14,7 +14,6 @@ def doesJobsExists(String jobName) {
  */
 def copyFilesFromStandardTemplate(String folder) {
   sh "pwd"
-  sh "find ../*"
   return sh(script: "cp -rv ../../src/standardTemplates/${folder} .")
 }
 /**
