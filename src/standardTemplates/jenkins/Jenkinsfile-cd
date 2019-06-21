@@ -6,8 +6,7 @@ void deployStacks(String env) {
   node('alpine') {
     checkout scm
     def jenkinsUtils = load "./jenkins/Utils.groovy"
-    def stackName = "$env-${jenkinsUtils.getStackName()}"
-    println "stackName: $stackName"
+    def stackName = jenkinsUtils.getStackName(env)
     // withCredentials([[$class: "AmazonWebServicesCredentialsBinding", credentialsId: "AWSJenkinksUser"]]) {
     //   // eg. aws stack
     //   sh "aws cloudformation deploy --stack-name $stackName --region us-east-1 --template-file cfn/templates/cfn.yaml --parameter-overrides name=value --tags Environment=$env"
