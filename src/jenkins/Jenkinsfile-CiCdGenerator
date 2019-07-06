@@ -30,7 +30,7 @@ def gitCommitPush(String message) {
 pipeline {
   agent {
     node {
-      label 'master'
+      label 'alpine'
     }
   }
   stages {
@@ -115,7 +115,7 @@ pipeline {
       post {
         success {
           echo 'Creating pipeline'
-          build job: "ci-cd-generator/jobs-generator-${config.REPO_TYPE}", parameters: [[$class: 'StringParameterValue', name: 'REPO_NAME', value: "${config.REPO_NAME}"]], wait: false
+          build job: "ci-cd-generator/jobs-generator-${config.REPO_TYPE}", parameters: [[$class: 'StringParameterValue', name: 'REPO_URL', value: "${env.REPO_URL}"]], wait: false
         }
         aborted {
           echo "job aborted."

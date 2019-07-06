@@ -1,0 +1,88 @@
+#!/usr/bin/env groovy
+
+// URL: https://github.com/sriramsundhar/ci-cd-generator
+// REPO_NAME: sriramsundhar/ci-cd-generator
+def repoUrl = REPO_URL
+println("repoUrl: $repoUrl")
+def projectName = repoUrl.tokenize('/').last().tokenize('.').first()
+def org = repoUrl.tokenize('/').first(). tokenize(':').last()
+
+def sshKeyId = 'jenkins'
+
+// Create folder for the repo
+folder(projectName) {
+  description("PR, CI & CD jobs for ${repoUrl} repository")
+}
+
+pipelineJob(projectName + '/ci') {
+  description('This task runs and creates a release candidate (git tag) when ever a change request lands on the trunk (master) branch.')
+  definition {
+    cpsScm {
+      lightweight(true)
+      scm {
+        git {
+          branch('refs/heads/master')
+          remote {
+            url(repoUrl)
+            credentials(sshKeyId)
+            refspec('+refs/heads/master:refs/remotes/origin/master')
+          }
+        }
+      }
+      scriptPath('jenkins/Jenkinsfile-ci')
+    }
+  }
+  triggers {
+    bitbucketRepositoryPushAction(false, "refs/heads/master")
+  }
+}
+
+// Create Job inside the folder
+pipelineJob(projectName + '/pr') {
+  description('This task runs when a pull request is created or when a commit is pushed into an existing pull request.')
+  definition {
+    cpsScm {
+      lightweight(false)
+      scm {
+        git {
+          branch('refs/heads/${BITBUCKET_SOURCE_BRANCH}')
+          remote {
+            url(repoUrl)
+            credentials(sshKeyId)
+          }
+        }
+      }
+      scriptPath('jenkins/Jenkinsfile-ci')
+    }
+    triggers {
+      bitbucketPullRequestCreatedAction()
+      bitbucketPullRequestUpdatedAction()
+    }
+  }
+}
+
+
+pipelineJob(projectName + '/cd') {
+  description('This task is triggered when a sucessful release candidate is created as part of ci.')
+  definition {
+    cpsScm {
+      lightweight(true)
+      scm {
+        git {
+          branch('refs/tags/${BUILD_VERSION}')
+          remote {
+            url(repoUrl)
+            credentials(sshKeyId)
+          }
+        }
+      }
+      scriptPath('jenkins/Jenkinsfile-cd')
+    }
+  }
+  parameters {
+    gitParam('BUILD_VERSION') {
+      tagFilter('*')
+      sortMode('DESCENDING_SMART')
+    }
+  }
+}
