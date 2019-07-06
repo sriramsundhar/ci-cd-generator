@@ -30,7 +30,7 @@ def gitCommitPush(String message) {
 pipeline {
   agent {
     node {
-      label 'master'
+      label 'alpine'
     }
   }
   stages {
