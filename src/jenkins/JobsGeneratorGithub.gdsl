@@ -23,7 +23,7 @@ pipelineJob(projectName + '/ci') {
         git {
           branch('refs/heads/master')
           remote {
-            github(repoUrl, 'ssh')
+            url(repoUrl)
             credentials(sshKeyId)
             refspec('+refs/heads/master:refs/remotes/origin/master')
           }
@@ -47,7 +47,7 @@ pipelineJob(projectName + '/pr') {
         git {
           branch('${sha1}')
           remote {
-            github(repoUrl, 'ssh')
+            url(repoUrl)
             credentials(sshKeyId)
             refspec('+refs/pull/*:refs/remotes/origin/pr/*')
           }
@@ -96,7 +96,7 @@ pipelineJob(projectName + '/cd') {
         git {
           branch('refs/tags/${BUILD_VERSION}')
           remote {
-            github(repoUrl, 'ssh')
+            url(repoUrl)
             credentials(sshKeyId)
           }
         }
