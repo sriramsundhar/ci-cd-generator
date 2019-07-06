@@ -30,7 +30,7 @@ def gitCommitPush(String message) {
 pipeline {
   agent {
     node {
-      label 'master'
+      label 'alpine'
     }
   }
   stages {
@@ -38,14 +38,17 @@ pipeline {
       steps {
         script {
           config = readProperties(file: 'src/jenkins/config.env')
-          config.GIT_URL = "${config.GITHUB}:${env.REPO_NAME}.git"
+          config.REPO_NAME = env.GIT_URL.tokenize('/').last().tokenize('.').first()
+          println("REPO_NAME: ${config.REPO_NAME}")
         }
       }
     }
     stage('SanityCheck: Pipeline') {
       steps {
         script {
-          def projectName = env.REPO_NAME.tokenize('/').last()
+          // def projectName = env.REPO_NAME.tokenize('/').last()
+          def projectName = env.GIT_URL.tokenize('/').last().tokenize('.').first()
+          println("projectName: ${projectName}")
           env.JOB_EXISTS = doesJobsExists(projectName)
         }
       }
@@ -55,7 +58,7 @@ pipeline {
       when { environment name: 'JOB_EXISTS', value: 'true' }
       steps {
         timeout(time: 15, unit: 'MINUTES') {
-          input(message: "Jenkins pipeline for this repo ${env.REPO_NAME} exists. Do you want to override pipeline config?")
+          input(message: "Jenkins pipeline for this repo ${config.REPO_NAME} exists. Do you want to override pipeline config?")
         }
       }
       post {
@@ -69,9 +72,9 @@ pipeline {
     }
     stage('SanityCheck: Git repo') {
       steps {
-        println("Checkout the repo: ${env.REPO_NAME}")
+        println("Checkout the repo: ${config.REPO_NAME}")
         dir(REPO_NAME) {
-          git(url: config.GIT_URL, credentialsId: "${config.SSH_KEY_ID}", branch: 'master')
+          git(url: env.GIT_URL, credentialsId: "${config.SSH_KEY_ID}", branch: 'master')
           script {
             env.JENKINS_FOLDER_EXISTS = fileExists('jenkins')
             env.CFN_FOLDER_EXISTS = fileExists('cfn')
@@ -82,9 +85,9 @@ pipeline {
     stage('Copy jenkins files') {
       when { environment name: 'JENKINS_FOLDER_EXISTS', value: 'false' }
       steps {
-        println("Copy jenkins reference files to ${env.REPO_NAME} repo")
+        println("Copy jenkins reference files to ${config.REPO_NAME} repo")
         dir(REPO_NAME) {
-          git(url: config.GIT_URL, credentialsId: "${config.SSH_KEY_ID}", branch: 'master')
+          git(url: env.GIT_URL, credentialsId: "${config.SSH_KEY_ID}", branch: 'master')
           sshagent(credentials: ["${config.SSH_KEY_ID}"], ignoreMissing: false) {
             copyFilesFromStandardTemplate('jenkins')
             gitCommitPush("Add jenkins files")
@@ -95,9 +98,9 @@ pipeline {
     stage('Copy CFN files') {
       when { environment name: 'CFN_FOLDER_EXISTS', value: 'false' }
       steps {
-        println("Copy CFN reference files to ${env.REPO_NAME} repo")
+        println("Copy CFN reference files to ${config.REPO_NAME} repo")
         dir(REPO_NAME) {
-          git(url: config.GIT_URL, credentialsId: "${config.SSH_KEY_ID}", branch: 'master')
+          git(url: env.GIT_URL, credentialsId: "${config.SSH_KEY_ID}", branch: 'master')
           sshagent(credentials: ["${config.SSH_KEY_ID}"], ignoreMissing: false) {
             copyFilesFromStandardTemplate('cfn')
             gitCommitPush("Add cfn files")
@@ -108,11 +111,13 @@ pipeline {
     stage('Trigger pipeline creation') {
       steps {
         println("Creating pipeline")
+        config.repoType = env.GIT_URL.contains('github') ? 'github' : 'bitbucket'
+        println(config.repoType)
       }
       post {
         success {
           echo 'Creating pipeline'
-          build job: 'ci-cd-generator/jobs-generator-github', parameters: [[$class: 'StringParameterValue', name: 'REPO_NAME', value: "${env.REPO_NAME}"]], wait: false
+          // build job: 'ci-cd-generator/jobs-generator-github', parameters: [[$class: 'StringParameterValue', name: 'REPO_NAME', value: "${config.REPO_NAME}"]], wait: false
         }
         aborted {
           echo "job aborted."
