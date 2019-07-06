@@ -46,9 +46,7 @@ pipeline {
     stage('SanityCheck: Pipeline') {
       steps {
         script {
-          def projectName = env.REPO_URL.tokenize('/').last().tokenize('.').first()
-          println("projectName: ${projectName}")
-          env.JOB_EXISTS = doesJobsExists(projectName)
+          env.JOB_EXISTS = doesJobsExists(config.REPO_NAME)
         }
       }
     }

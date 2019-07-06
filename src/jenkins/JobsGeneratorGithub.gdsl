@@ -2,19 +2,16 @@
 
 // URL: https://github.com/sriramsundhar/ci-cd-generator
 // REPO_NAME: sriramsundhar/ci-cd-generator
-def repoName = REPO_NAME
-def gitRepo = 'git@github.com/' + repoName
-println("RepoName: $repoName")
-println("gitRepo: $gitRepo")
-def (org, projectName) = repoName.tokenize('/')
-//def org = repoName.tokenize('/').last().split("\\.")[1]
-//def projectName = repoName.tokenize('/').last().split("\\.")[0]
-println(projectName)
-def sshKeyId = SSH_KEY_ID
+def repoUrl = REPO_URL
+println("repoUrl: $repoUrl")
+def projectName = repoUrl.tokenize('/').last().tokenize('.').first()
+def org = repoUrl.tokenize('/').first(). tokenize(':').last()
+
+def sshKeyId = 'jenkins'
 
 // Create folder for the repo
 folder(projectName) {
-  description("PR, CI & CD jobs for ${repoName} repository")
+  description("PR, CI & CD jobs for ${repoUrl} repository")
 }
 
 pipelineJob(projectName + '/ci') {
@@ -26,7 +23,7 @@ pipelineJob(projectName + '/ci') {
         git {
           branch('refs/heads/master')
           remote {
-            github(repoName, 'ssh')
+            github(repoUrl, 'ssh')
             credentials(sshKeyId)
             refspec('+refs/heads/master:refs/remotes/origin/master')
           }
@@ -50,7 +47,7 @@ pipelineJob(projectName + '/pr') {
         git {
           branch('${sha1}')
           remote {
-            github(repoName, 'ssh')
+            github(repoUrl, 'ssh')
             credentials(sshKeyId)
             refspec('+refs/pull/*:refs/remotes/origin/pr/*')
           }
@@ -99,7 +96,7 @@ pipelineJob(projectName + '/cd') {
         git {
           branch('refs/tags/${BUILD_VERSION}')
           remote {
-            github(gitRepo, 'ssh')
+            github(repoUrl, 'ssh')
             credentials(sshKeyId)
           }
         }
