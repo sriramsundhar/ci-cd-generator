@@ -14,7 +14,7 @@ def doesJobsExists(String jobName) {
  */
 def copyFilesFromStandardTemplate(String folder) {
   sh "pwd"
-  return sh(script: "cp -rv ../../src/standardTemplates/${folder} .")
+  return sh(script: "cp -rv ../src/standardTemplates/${folder} .")
 }
 /**
  * Add all files in the folder and push it to source repo
@@ -30,7 +30,7 @@ def gitCommitPush(String message) {
 pipeline {
   agent {
     node {
-      label 'alpine'
+      label 'master'
     }
   }
   stages {
@@ -38,7 +38,7 @@ pipeline {
       steps {
         script {
           config = readProperties(file: 'src/jenkins/config.env')
-          config.REPO_NAME = env.GIT_URL.tokenize('/').last().tokenize('.').first()
+          config.REPO_NAME = env.REPO_URL.tokenize('/').last().tokenize('.').first()
           println("REPO_NAME: ${config.REPO_NAME}")
         }
       }
@@ -46,8 +46,7 @@ pipeline {
     stage('SanityCheck: Pipeline') {
       steps {
         script {
-          // def projectName = env.REPO_NAME.tokenize('/').last()
-          def projectName = env.GIT_URL.tokenize('/').last().tokenize('.').first()
+          def projectName = env.REPO_URL.tokenize('/').last().tokenize('.').first()
           println("projectName: ${projectName}")
           env.JOB_EXISTS = doesJobsExists(projectName)
         }
@@ -73,8 +72,8 @@ pipeline {
     stage('SanityCheck: Git repo') {
       steps {
         println("Checkout the repo: ${config.REPO_NAME}")
-        dir(REPO_NAME) {
-          git(url: env.GIT_URL, credentialsId: "${config.SSH_KEY_ID}", branch: 'master')
+        dir(config.REPO_NAME) {
+          git(url: env.REPO_URL, credentialsId: "${config.SSH_KEY_ID}", branch: 'master')
           script {
             env.JENKINS_FOLDER_EXISTS = fileExists('jenkins')
             env.CFN_FOLDER_EXISTS = fileExists('cfn')
@@ -86,8 +85,8 @@ pipeline {
       when { environment name: 'JENKINS_FOLDER_EXISTS', value: 'false' }
       steps {
         println("Copy jenkins reference files to ${config.REPO_NAME} repo")
-        dir(REPO_NAME) {
-          git(url: env.GIT_URL, credentialsId: "${config.SSH_KEY_ID}", branch: 'master')
+        dir(config.REPO_NAME) {
+          git(url: env.REPO_URL, credentialsId: "${config.SSH_KEY_ID}", branch: 'master')
           sshagent(credentials: ["${config.SSH_KEY_ID}"], ignoreMissing: false) {
             copyFilesFromStandardTemplate('jenkins')
             gitCommitPush("Add jenkins files")
@@ -99,8 +98,8 @@ pipeline {
       when { environment name: 'CFN_FOLDER_EXISTS', value: 'false' }
       steps {
         println("Copy CFN reference files to ${config.REPO_NAME} repo")
-        dir(REPO_NAME) {
-          git(url: env.GIT_URL, credentialsId: "${config.SSH_KEY_ID}", branch: 'master')
+        dir(config.REPO_NAME) {
+          git(url: env.REPO_URL, credentialsId: "${config.SSH_KEY_ID}", branch: 'master')
           sshagent(credentials: ["${config.SSH_KEY_ID}"], ignoreMissing: false) {
             copyFilesFromStandardTemplate('cfn')
             gitCommitPush("Add cfn files")
@@ -111,13 +110,14 @@ pipeline {
     stage('Trigger pipeline creation') {
       steps {
         println("Creating pipeline")
-        config.repoType = env.GIT_URL.contains('github') ? 'github' : 'bitbucket'
-        println(config.repoType)
+        script{
+          config.REPO_TYPE = env.REPO_URL.contains('github') ? 'github' : 'bitbucket'
+        }
       }
       post {
         success {
           echo 'Creating pipeline'
-          // build job: 'ci-cd-generator/jobs-generator-github', parameters: [[$class: 'StringParameterValue', name: 'REPO_NAME', value: "${config.REPO_NAME}"]], wait: false
+          build job: "ci-cd-generator/jobs-generator-${config.REPO_TYPE}", parameters: [[$class: 'StringParameterValue', name: 'REPO_NAME', value: "${config.REPO_NAME}"]], wait: false
         }
         aborted {
           echo "job aborted."
