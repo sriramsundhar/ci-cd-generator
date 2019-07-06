@@ -10,7 +10,7 @@ node('alpine') {
 
   }
   stage('Test') {
-    prinln("StageName: $STAGE_NAME")
+    println("StageName: $STAGE_NAME")
     withCredentials([[
       $class: "AmazonWebServicesCredentialsBinding",
       credentialsId: "aws-role"
