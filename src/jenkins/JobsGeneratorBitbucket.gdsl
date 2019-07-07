@@ -55,7 +55,7 @@ pipelineJob(projectName + '/pr') {
       scriptPath('jenkins/Jenkinsfile-ci')
     }
     triggers {
-      bitbucketPullRequestCreatedAction()
+      bitbucketPullRequestCreatedAction(),
       bitbucketPullRequestUpdatedAction()
     }
   }
