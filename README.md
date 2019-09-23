@@ -6,7 +6,7 @@ CI-CD Generator for Jenkins
 
 ## Demo
 
-[![Watch the video](https://youtu.be/23oZO27Xz74)
+[![ci-cd-generator](https://i.ytimg.com/vi/23oZO27Xz74/1.jpg)(https://youtu.be/23oZO27Xz74)
 
 ## Dependencies
 	* https://plugins.jenkins.io/job-dsl
